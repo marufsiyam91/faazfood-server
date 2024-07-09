@@ -1,78 +1,122 @@
-const fs = require('fs')
+const Food = require('../models/foodModels')
 
 
-let allFoodItems = JSON.parse(fs.readFileSync('./dev_data/foods.json', 'utf-8'))
 
-const getAllFoodItems = (req, res) => {
-    res.json({
-        status: 'success',
-        result: allFoodItems.length,
-        data: allFoodItems
-    })
-}
+const getAllFoodItems = async (req, res) => {
+    try {
+//1) filtering
+        const queryObj = { ...req.query }
+        const excludedFields = ['page', 'sort', 'limit', 'fields']
+        excludedFields.forEach(el => delete queryObj[el])
+//2) advanced filtering
+        let querySrt = JSON.stringify(queryObj);
+        querySrt = querySrt.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
+        console.log(JSON.parse(querySrt))
 
-const createFoodItem = (req, res) => {
-    const foodId = allFoodItems[allFoodItems.length - 1].id + 1
+        let query = Food.find(JSON.parse(querySrt))
+//3) sorting
+        if (req.query.sort) {
+            const sortBy = req.query.sort.split(',').join(' ');
+            query = query.sort(sortBy)
+        }
+//4) pagination
+        const page = req.query.page * 1 || 1;
+        const limit = req.query.limit * 1 || 12;
+        const skip = (page - 1) * limit;
 
-    const newFood = Object.assign({ id: foodId }, req.body)
-    allFoodItems.push(newFood)
+        query = query.skip(skip).limit(limit)
 
-    fs.writeFile('./dev_data/foods.json', JSON.stringify(allFoodItems), (err) => {
+        if (req.query.page) {
+            const numFoods = await Food.countDocuments();
+            if(skip >= numFoods) throw new Error('This page does not exist')
+        }
+        
+        let allFoodItems = await query
+
+        console.log(queryObj)
+    
         res.json({
             status: 'success',
+            result: allFoodItems.length,
+            data: allFoodItems
+        })
+    } catch (err) {
+        res.status(404).json({
+            status: 'fail',
+            message: err
+        })
+    }
+}
+
+const createFoodItem = async (req, res) => {
+    try {
+        const newFood = await Food.create(req.body)
+        
+        res.status(200).json({
+            status: 'success',
             data: {
-                foodItem: newFood
+                food: newFood
             }
         })
-    })
-}
-
-const getFoodItem = (req, res) => {
-
-    if (req.params.id * 1 > allFoodItems.length) {
-        res.json({
-            status: 'error',
-            message: 'no such food exist'
+    } catch (error) {
+        res.status(404).json({
+            status: 'fail',
+            message: error
         })
     }
 
-    const desiredFood = allFoodItems.find(foodItem => foodItem.id === Number(req.params.id))
-
-    res.json({
-        status: 'success',
-        data: desiredFood
-    })
 }
 
-const updateFoodItem = (req, res) => {
-    if (req.params.id > allFoodItems.length) {
-        res.json({
-            status: 'error',
-            message: 'no such food exist'
+const getFoodItem = async (req, res) => {
+    try {
+        const foodItem = await Food.findById(req.params.id)
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                data: foodItem
+            }
+        })
+    } catch (err) {
+        res.status(404).json({
+            status: 'fail',
+            message: err
         })
     }
-    
-    res.json({
-        status: 'success',
-        message: 'food updated successfully'
-    })
 }
 
-const deleteFoodItem = (req, res) => {
-    if (req.params.id * 1 > allFoodItems.length) {
-        res.json({
-            status: 'error',
-            message: 'no such food exist'
+const updateFoodItem = async (req, res) => {    
+    try {
+        const food = await Food.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true
+        })
+        res.status(200).json({
+            status: 'success',
+            message: 'food updated successfully'
+        })
+    } catch (err) {
+        res.status(404).json({
+            status: 'fail',
+            message: err
         })
     }
+}
 
-    const restFoods = allFoodItems.filter(foodItem => foodItem.id !== Number(req.params.id))
-    allFoodItems = restFoods
+const deleteFoodItem = async (req, res) => {
+    try {
+        await Food.findByIdAndDelete(req.params.id )
 
-    res.json({
-        status: 'success',
-        message: 'foodItem deleted successfully'
-    })
+        res.status(204).json({
+            status: 'success',
+            message: 'foodItem deleted successfully'
+        })
+    } catch (err) {
+        res.status(404).json({
+            status: 'fail',
+            message: err
+        })
+    }
 }
 
 module.exports = {getAllFoodItems, createFoodItem, getFoodItem, updateFoodItem, deleteFoodItem}
