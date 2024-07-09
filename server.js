@@ -1,16 +1,23 @@
 const express = require('express')
+const cors = require('cors')
 const foodRouter = require('./routes/foodRouter')
+const connectDB = require('./config/db')
+require('dotenv').config();
 
 const port = 8800
 const app = express()
 app.use(express.json())
+app.use(cors())
 
+//db connection
+connectDB()
 
 app.use('/api/v1/foods', foodRouter)
 
 app.listen(port, () => {
     console.log(`server is running on port ${port}`)
 })
+
 
 
 
