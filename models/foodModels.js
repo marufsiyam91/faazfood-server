@@ -5,11 +5,16 @@ const foodSchema = new mongoose.Schema({
     title: {
         type: String,
         required: [true, 'food must have a title'],
-        unique: true
+        unique: true,
+        trim: true,
+        maxLength: [40, 'A tour name should must contain maximum 40 charecter'],
+        minLength: [6, 'A tour name should have more than or equal 6 charecter']
     },
     rating: {
         type: Number,
         required: true, 
+        min: [1, 'rating must be above 1.0'],
+        max: [1, 'rating must be below 5.0']
     },
     price: {
         type: Number,
